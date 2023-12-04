@@ -25,7 +25,7 @@ from rlcard.agents.dqn_agent_fg import DQNAgent
 def train(args):
     # Check whether gpu is available
     device = get_device()
-
+    # print(torch.backends.mps.is_available())
     # Seed numpy, torch, random
     set_seed(args.seed)
 
@@ -41,7 +41,7 @@ def train(args):
                 # env=env,
                 device=device,
                 save_path=args.log_dir,
-                save_every=args.save_every
+                save_every=args.save_every,
             )
 
     agents = [agent]

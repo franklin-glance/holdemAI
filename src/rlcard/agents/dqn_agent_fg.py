@@ -226,16 +226,17 @@ class DQNAgent:
                  epsilon_greedy=1.0,
                  epsilon_min=0.01,
                  epsilon_decay=0.995,
-                 learning_rate=1e-3,
+                 learning_rate=0.001,
                  max_memory_size=2000,
-                 batch_size=32,
-                 train_every=1,
+                 batch_size=64,
+                 train_every=100,
                  save_path=None, 
                  save_every=float('inf'),
                  device=None,
                  update_target_every=100):
 
 
+        self.device = device
         ##### NN Input Configuration #####
         card_channels = 6 # 2 hole, 3 flop, 1 turn, 1 river, all public cards, and all hole and public cards
         card_channel_shape = (4, 13) # (4 suits, 13 ranks)
@@ -288,7 +289,6 @@ class DQNAgent:
         self.train_t = 0
         self.save_path = save_path
         self.save_every = save_every
-        self.device = device
 
         self.batch_size = batch_size # number of samples to train on
 
@@ -297,17 +297,8 @@ class DQNAgent:
 
 
     def _build_nn_model(self):
-        basicmodel = nn.Sequential(
-            nn.Linear(self.state_size, 256),
-            nn.ReLU(),
-            nn.Linear(256, 128),
-            nn.ReLU(),
-            nn.Linear(128, 64),
-            nn.ReLU(),
-            nn.Linear(64, self.action_size))
-        
-        self.model = NNModel(self.card_tensor_input_dim, self.action_tensor_input_dim, self.action_size)
-        self.target_model = NNModel(self.card_tensor_input_dim, self.action_tensor_input_dim, self.action_size)
+        self.model = NNModel(self.card_tensor_input_dim, self.action_tensor_input_dim, self.action_size).to(self.device)
+        self.target_model = NNModel(self.card_tensor_input_dim, self.action_tensor_input_dim, self.action_size).to(self.device)
        
         
         self.loss_fn = nn.MSELoss()
@@ -357,13 +348,13 @@ class DQNAgent:
         """predict the q values, mask illegal actions with -inf"""
         card_state, action_state = process_state(state)
         with torch.no_grad():
-            card_tensor = torch.tensor(card_state, dtype=torch.float32) 
-            action_tensor = torch.tensor(action_state, dtype=torch.float32)
+            card_tensor = torch.tensor(card_state, dtype=torch.float32).to(self.device)
+            action_tensor = torch.tensor(action_state, dtype=torch.float32).to(self.device)
             card_tensor = card_tensor.unsqueeze(0)
             action_tensor = action_tensor.unsqueeze(0)
 
 
-            q_values = self.model(card_tensor, action_tensor)[-1]
+            q_values = self.model(card_tensor, action_tensor)[-1].cpu().numpy()
             
             masked_q_values = -np.inf * np.ones(NUM_BETTING_OPTIONS, dtype=float)
             legal_actions = list(state['legal_actions'].keys())
@@ -408,13 +399,13 @@ class DQNAgent:
 
         card_tensors = [torch.tensor(state[0], dtype=torch.float32) for state in states]
         action_tensors = [torch.tensor(state[1], dtype=torch.float32) for state in states]
-        card_tensors = torch.stack(card_tensors)
-        action_tensors = torch.stack(action_tensors)
+        card_tensors = torch.stack(card_tensors).to(self.device)
+        action_tensors = torch.stack(action_tensors).to(self.device)
 
         next_card_tensors = [torch.tensor(state[0], dtype=torch.float32) for state in next_states]
         next_action_tensors = [torch.tensor(state[1], dtype=torch.float32) for state in next_states]
-        next_card_tensors = torch.stack(next_card_tensors)
-        next_action_tensors = torch.stack(next_action_tensors)
+        next_card_tensors = torch.stack(next_card_tensors).to(self.device)
+        next_action_tensors = torch.stack(next_action_tensors).to(self.device)
 
 
         
@@ -423,9 +414,9 @@ class DQNAgent:
 
         # states = torch.tensor(np.array(states), dtype=torch.float32)
         # next_states = torch.tensor(np.array(next_states), dtype=torch.float32)
-        actions = torch.tensor(np.array(actions), dtype=torch.long) 
-        rewards = torch.tensor(np.array(rewards), dtype=torch.float32)
-        dones = torch.tensor(np.array(dones), dtype=torch.float32)
+        actions = torch.tensor(np.array(actions), dtype=torch.long).to(self.device) 
+        rewards = torch.tensor(np.array(rewards), dtype=torch.float32).to(self.device)
+        dones = torch.tensor(np.array(dones), dtype=torch.float32).to(self.device)
         
 
         # Predict Q-values for the current states
@@ -454,4 +445,4 @@ class DQNAgent:
         self.train_t += 1
         # update target model
         if self.train_t % self.update_target_every == 0:
-            self.target_model = deepcopy(self.model)
+            self.target_model = deepcopy(self.model).to(self.device)
