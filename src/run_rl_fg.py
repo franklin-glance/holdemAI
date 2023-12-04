@@ -44,16 +44,6 @@ def train(args):
                 save_every=args.save_every
             )
 
-    # agent = DQNAgent(
-    #             num_actions=env.num_actions,
-    #             state_shape=env.state_shape[0],
-    #             mlp_layers=[64, 64],
-    #             device=device,
-    #             save_path=args.log_dir,
-    #             save_every=args.save_every
-    #         )
-
-
     agents = [agent]
     for _ in range(1, env.num_players):
         agents.append(RandomAgent(num_actions=env.num_actions))
@@ -103,7 +93,6 @@ if __name__ == '__main__':
         type=str,
         default='no-limit-holdem-fg',
         choices=[
-            'leduc-holdem',
             'limit-holdem',
             'no-limit-holdem',
             'no-limit-holdem-fg'

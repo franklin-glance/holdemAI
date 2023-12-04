@@ -1,6 +1,7 @@
 import numpy as np
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 import random
 from collections import namedtuple
 from collections import deque
@@ -113,7 +114,7 @@ def process_state(state):
         action_feature[i] = action_tensor
 
     state_tuple = (card_feature, action_feature)
-    return flatten_state(state_tuple)
+    return state_tuple
 
 
 
@@ -160,6 +161,55 @@ def process_ts(ts):
     done = 1 if done else 0
     return Transition(state, action, reward, next_state, done, legal_actions)
 
+class NNModel(nn.Module):
+
+    def __init__(self, card_tensor_input_dim, action_tensor_input_dim, action_dim):
+        super(NNModel, self).__init__()
+
+        self.card_tensor_input_dim = card_tensor_input_dim
+        self.action_tensor_input_dim = action_tensor_input_dim
+        self.action_dim = action_dim
+
+        self.card_conv1 = nn.Conv2d(in_channels=6, out_channels=16, kernel_size=3, stride=1, padding=1)
+        self.card_conv2 = nn.Conv2d(in_channels=16, out_channels=32, kernel_size=3, stride=1, padding=1)
+        self.card_conv3 = nn.Conv2d(in_channels=32, out_channels=64, kernel_size=3, stride=1, padding=1)
+
+
+        self.card_flattened_size = 64 * 4 * 13 
+        self.action_flattened_size = 24 * 3 * NUM_BETTING_OPTIONS
+
+        # input shape: [batch_size, sequence_length, features]
+        self.action_lstm = nn.LSTM(input_size=15, hidden_size=128, num_layers=2, batch_first=True)
+
+
+        self.fc1 = nn.Linear(self.card_flattened_size + 128, 512)
+        self.fc2 = nn.Linear(512, 256)
+        self.fc3 = nn.Linear(256, 128)
+        self.fc4 = nn.Linear(128, action_dim)
+
+    def forward(self, card_tensor, action_tensor):
+        # card tensor shape: [batch size, card channels, suits, ranks] -- [batch_size, 6, 4, 13]
+        # Action tensor shape: [batch_size, sequence_length, features] -- [batch_size, 24, features]
+
+        x = F.relu(self.card_conv1(card_tensor))
+        x = F.relu(self.card_conv2(x))
+        x = F.relu(self.card_conv3(x))
+        card_features = x.view(x.size(0), -1) # [batch.size, 3328]
+        action_tensor = action_tensor.view(action_tensor.shape[0], action_tensor.shape[1], -1)
+
+
+        output, (hn, cn) = self.action_lstm(action_tensor)
+
+        action_features = hn[-1].view(hn[-1].size(0), -1) 
+
+        combined = torch.cat((card_features, action_features), dim=1)
+        combined = F.relu(self.fc1(combined))
+        combined = F.relu(self.fc2(combined))
+        combined = F.relu(self.fc3(combined))
+        q_values = self.fc4(combined)
+
+        return q_values
+
 class DQNAgent:
     """
     Required functions:
@@ -202,6 +252,8 @@ class DQNAgent:
 
         self.state_shape = (card_feature_shape, action_feature_shape) 
 
+        self.card_tensor_input_dim = np.prod(card_feature_shape)
+        self.action_tensor_input_dim = np.prod(action_feature_shape)
         # ((6, 4, 13), (24, 4, 9))
 
         self.input_dimension = np.prod(card_feature_shape) + np.prod(action_feature_shape)
@@ -239,7 +291,7 @@ class DQNAgent:
 
 
     def _build_nn_model(self):
-        self.model = nn.Sequential(
+        basicmodel = nn.Sequential(
             nn.Linear(self.state_size, 256),
             nn.ReLU(),
             nn.Linear(256, 128),
@@ -247,6 +299,10 @@ class DQNAgent:
             nn.Linear(128, 64),
             nn.ReLU(),
             nn.Linear(64, self.action_size))
+        
+        self.model = NNModel(self.card_tensor_input_dim, self.action_tensor_input_dim, self.action_size)
+        self.target_model = NNModel(self.card_tensor_input_dim, self.action_tensor_input_dim, self.action_size)
+       
         
         self.loss_fn = nn.MSELoss()
         self.optimizer = torch.optim.Adam(self.model.parameters(), self.lr)
@@ -293,11 +349,15 @@ class DQNAgent:
 
     def predict(self, state):
         """predict the q values, mask illegal actions with -inf"""
-        flattened_state = process_state(state)
+        card_state, action_state = process_state(state)
         with torch.no_grad():
-            input_tensor = torch.tensor(flattened_state, dtype=torch.float32) 
+            card_tensor = torch.tensor(card_state, dtype=torch.float32) 
+            action_tensor = torch.tensor(action_state, dtype=torch.float32)
+            card_tensor = card_tensor.unsqueeze(0)
+            action_tensor = action_tensor.unsqueeze(0)
 
-            q_values = self.model(input_tensor)
+
+            q_values = self.model(card_tensor, action_tensor)[-1]
             
             masked_q_values = -np.inf * np.ones(NUM_BETTING_OPTIONS, dtype=float)
             legal_actions = list(state['legal_actions'].keys())
@@ -340,19 +400,37 @@ class DQNAgent:
         states, actions, rewards, next_states, dones, _ = zip(*batch)
 
 
+        card_tensors = [torch.tensor(state[0], dtype=torch.float32) for state in states]
+        action_tensors = [torch.tensor(state[1], dtype=torch.float32) for state in states]
+        card_tensors = torch.stack(card_tensors)
+        action_tensors = torch.stack(action_tensors)
+
+        next_card_tensors = [torch.tensor(state[0], dtype=torch.float32) for state in next_states]
+        next_action_tensors = [torch.tensor(state[1], dtype=torch.float32) for state in next_states]
+        next_card_tensors = torch.stack(next_card_tensors)
+        next_action_tensors = torch.stack(next_action_tensors)
+
+
         
-        states = torch.tensor(np.array(states), dtype=torch.float32)
-        next_states = torch.tensor(np.array(next_states), dtype=torch.float32)
+
+
+
+        # states = torch.tensor(np.array(states), dtype=torch.float32)
+        # next_states = torch.tensor(np.array(next_states), dtype=torch.float32)
         actions = torch.tensor(np.array(actions), dtype=torch.long) 
         rewards = torch.tensor(np.array(rewards), dtype=torch.float32)
         dones = torch.tensor(np.array(dones), dtype=torch.float32)
         
 
         # Predict Q-values for the current states
-        predicted_q_values = self.model(states)
+        # predicted_q_values = self.model(states)
+
+        predicted_q_values = self.model(card_tensors, action_tensors)
 
         # Predict Q-values for the next states using the target network
-        next_q_values = self.model(next_states) # .detach().max(1)[0]
+        # next_q_values = self.model(next_states) # .detach().max(1)[0]
+
+        next_q_values = self.target_model(next_card_tensors, next_action_tensors)
 
 
         # Compute the target Q-values
