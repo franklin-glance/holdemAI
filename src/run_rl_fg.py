@@ -25,8 +25,6 @@ from rlcard.agents.dqn_agent_fg import DQNAgent
 def train(args):
     # Check whether gpu is available
     device = get_device()
-    # print(torch.backends.mps.is_available())
-    # Seed numpy, torch, random
     set_seed(args.seed)
 
     # Make the environment with seed
@@ -39,9 +37,18 @@ def train(args):
 
     agent = DQNAgent(
                 # env=env,
-                device=device,
+                discount_factor=args.discount_factor,
+                epsilon_greedy=args.epsilon_greedy,
+                epsilon_min=args.epsilon_min,
+                epsilon_decay=args.epsilon_decay,
+                learning_rate=args.learning_rate,
+                max_memory_size=args.max_memory_size,
+                batch_size=args.batch_size,
+                train_every=args.train_every,
                 save_path=args.log_dir,
                 save_every=args.save_every,
+                device=device,
+                update_target_every=args.update_target_every,
             )
 
     agents = [agent]
@@ -148,6 +155,43 @@ if __name__ == '__main__':
         "--save_every",
         type=int,
         default=-1)
+    parser.add_argument(
+        "--discount_factor",
+        type=float,
+        default=0.95)
+    parser.add_argument(
+        "--epsilon_greedy",
+        type=float,
+        default=1.0)
+
+    parser.add_argument(
+        "--epsilon_min",
+        type=float,
+        default=0.01)
+    parser.add_argument(
+        "--epsilon_decay",
+        type=float,
+        default=0.995)
+    parser.add_argument(
+        "--learning_rate",
+        type=float,
+        default=0.01)
+    parser.add_argument(
+        "--max_memory_size",
+        type=int,
+        default=20000)
+    parser.add_argument(
+        "--train_every",
+        type=int,
+        default=1)
+    parser.add_argument(
+        "--batch_size",
+        type=int,
+        default=128)
+    parser.add_argument(
+        "--update_target_every",
+        type=int,
+        default=100)
 
     args = parser.parse_args()
 
