@@ -156,7 +156,6 @@ class DQNAgent(object):
         best_action_idx = legal_actions.index(np.argmax(q_values))
         probs[best_action_idx] += (1.0 - epsilon)
         action_idx = np.random.choice(np.arange(len(probs)), p=probs)
-
         return legal_actions[action_idx]
 
     def eval_step(self, state):

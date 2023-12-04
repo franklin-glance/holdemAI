@@ -1,4 +1,4 @@
-from .utils import compare_hands
+from rlcard.games.limitholdem.utils import compare_hands
 import numpy as np
 
 
@@ -21,24 +21,15 @@ class LimitHoldemJudger:
         """
         # Convert the hands into card indexes
         hands = [[card.get_index() for card in hand] if hand is not None else None for hand in hands]
-        
+
+        winners = compare_hands(hands)
+
         in_chips = [p.in_chips for p in players]
-        remaining = sum(in_chips)
-        payoffs = [0] * len(hands)
-        while remaining > 0:
-            winners = compare_hands(hands)
-            each_win = self.split_pots_among_players(in_chips, winners)
-            
-            for i in range(len(players)):
-                if winners[i]:
-                    remaining -= each_win[i]
-                    payoffs[i] += each_win[i] - in_chips[i]
-                    hands[i] = None
-                    in_chips[i] = 0
-                elif in_chips[i] > 0:
-                    payoffs[i] += each_win[i] - in_chips[i]
-                    in_chips[i] = each_win[i]
-                    
+        each_win = self.split_pots_among_players(in_chips, winners)
+
+        payoffs = []
+        for i, _ in enumerate(players):
+            payoffs.append(each_win[i] - in_chips[i])
         assert sum(payoffs) == 0
         return payoffs
 

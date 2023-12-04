@@ -544,7 +544,7 @@ def compare_hands(hands):
     all_players = [0]*len(hands) #all the players in this round, 0 for losing and 1 for winning or draw
     if None in hands:
         fold_players = [i for i, j in enumerate(hands) if j is None]
-        if len(fold_players) == len(all_players) - 1:
+        if len(fold_players) == len(all_players) - 1: 
             for _ in enumerate(hands):
                 if _[0] in fold_players:
                     all_players[_[0]] = 0
