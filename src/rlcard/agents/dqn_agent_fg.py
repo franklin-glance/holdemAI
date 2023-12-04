@@ -235,7 +235,7 @@ class DQNAgent:
                  epsilon_greedy=1.0,
                  epsilon_min=0.01,
                  epsilon_decay=0.995,
-                 learning_rate=0.00005,
+                 learning_rate=0.01,
                  max_memory_size=20000,
                  batch_size=1000,
                  train_every=1,
