@@ -6,6 +6,9 @@ import random
 from collections import namedtuple
 from collections import deque
 
+from copy import deepcopy
+
+
 
 """
 Game State Representation: 
@@ -229,7 +232,8 @@ class DQNAgent:
                  train_every=1,
                  save_path=None, 
                  save_every=float('inf'),
-                 device=None):
+                 device=None,
+                 update_target_every=100):
 
 
         ##### NN Input Configuration #####
@@ -287,6 +291,8 @@ class DQNAgent:
         self.device = device
 
         self.batch_size = batch_size # number of samples to train on
+
+        self.update_target_every = update_target_every
 
 
 
@@ -423,13 +429,9 @@ class DQNAgent:
         
 
         # Predict Q-values for the current states
-        # predicted_q_values = self.model(states)
-
         predicted_q_values = self.model(card_tensors, action_tensors)
 
         # Predict Q-values for the next states using the target network
-        # next_q_values = self.model(next_states) # .detach().max(1)[0]
-
         next_q_values = self.target_model(next_card_tensors, next_action_tensors)
 
 
@@ -448,3 +450,8 @@ class DQNAgent:
         # Update epsilon
         if self.epsilon > self.epsilon_min:
             self.epsilon *= self.epsilon_decay
+
+        self.train_t += 1
+        # update target model
+        if self.train_t % self.update_target_every == 0:
+            self.target_model = deepcopy(self.model)
