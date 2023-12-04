@@ -29,7 +29,7 @@ def train(args):
 
     # Make the environment with seed
     env = rlcard.make(
-        args.env,
+        'no-limit-holdem-fg',
         config={
             'seed': args.seed,
         }
@@ -53,10 +53,26 @@ def train(args):
 
     agents = [agent]
     for _ in range(1, env.num_players):
-        agents.append(RandomAgent(num_actions=env.num_actions))
+        # agents.append(RandomAgent(num_actions=env.num_actions))
+        agents.append(agent)
+
     env.set_agents(agents)
 
     # Start training
+    # set args.log_dir to custom based on parameters
+    log_dir = ''
+    for key, value in vars(args).items():
+        if key == 'log_dir':
+            continue
+        # make key into abbreviation
+        key = key.split('_')
+        key = ''.join([word[0] for word in key])
+
+        log_dir += key + '_' + str(value) + '_'
+    log_dir = log_dir[:-1]
+    log_dir += '/'
+    args.log_dir = os.path.join(args.log_dir, log_dir)
+
     with Logger(args.log_dir) as logger:
         for episode in range(args.num_episodes):
             # Generate data from the environment
@@ -85,7 +101,7 @@ def train(args):
         csv_path, fig_path = logger.csv_path, logger.fig_path
 
     # Plot the learning curve
-    plot_curve(csv_path, fig_path, args.algorithm)
+    plot_curve(csv_path, fig_path, 'fg_dqn')
 
     # Save model
     save_path = os.path.join(args.log_dir, 'model.pth')
@@ -95,25 +111,6 @@ def train(args):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser("DQN/NFSP example in RLCard")
-    parser.add_argument(
-        '--env',
-        type=str,
-        default='no-limit-holdem-fg',
-        choices=[
-            'limit-holdem',
-            'no-limit-holdem',
-            'no-limit-holdem-fg'
-        ],
-    )
-    parser.add_argument(
-        '--algorithm',
-        type=str,
-        default='dqn',
-        choices=[
-            'dqn',
-            'nfsp',
-        ],
-    )
     parser.add_argument(
         '--cuda',
         type=str,
@@ -144,13 +141,11 @@ if __name__ == '__main__':
         type=str,
         default='experiments/no_limit_holdem_fg_dqn_result/',
     )
-    
-    parser.add_argument(
-        "--load_checkpoint_path",
-        type=str,
-        default="",
-    )
-    
+    # parser.add_argument(
+    #     "--load_checkpoint_path",
+    #     type=str,
+    #     default="",
+    # )
     parser.add_argument(
         "--save_every",
         type=int,

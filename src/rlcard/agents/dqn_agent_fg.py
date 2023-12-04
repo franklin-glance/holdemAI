@@ -222,6 +222,16 @@ class NNModel(nn.Module):
 
         return q_values
 
+def custom_loss(y_pred, y_true):
+    """
+    Penalizes the agent more when 'fold' is the ideal action and the agent
+    chooses to 'call' or 'raise' instead.
+    """
+    standard_loss = torch.mean((y_pred - y_true)**2)
+    fold_loss = torch.mean((y_pred[:, 0] - y_true[:, 0])**2)
+    return standard_loss + fold_loss
+
+
 class DQNAgent:
     """
     Required functions:
@@ -306,7 +316,7 @@ class DQNAgent:
         self.target_model = NNModel(self.card_tensor_input_dim, self.action_tensor_input_dim, self.action_size).to(self.device)
        
         
-        self.loss_fn = nn.MSELoss()
+        self.loss_fn = nn.MSELoss() 
         self.optimizer = torch.optim.Adam(self.model.parameters(), self.lr)
     
 
