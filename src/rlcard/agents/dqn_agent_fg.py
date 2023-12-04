@@ -184,6 +184,9 @@ class NNModel(nn.Module):
         # input shape: [batch_size, sequence_length, features]
         self.action_lstm = nn.LSTM(input_size=15, hidden_size=128, num_layers=2, batch_first=True)
 
+        self.action_fc1 = nn.Linear(self.action_tensor_input_dim, 128)
+        self.action_fc2 = nn.Linear(128, 128)
+
 
         self.fc1 = nn.Linear(self.card_flattened_size + 128, 512)
         self.fc2 = nn.Linear(512, 256)
@@ -198,12 +201,18 @@ class NNModel(nn.Module):
         x = F.relu(self.card_conv2(x))
         x = F.relu(self.card_conv3(x))
         card_features = x.view(x.size(0), -1) # [batch.size, 3328]
-        action_tensor = action_tensor.view(action_tensor.shape[0], action_tensor.shape[1], -1)
+        # action_tensor = action_tensor.view(action_tensor.shape[0], action_tensor.shape[1], -1)
 
 
-        output, (hn, cn) = self.action_lstm(action_tensor)
+        # output, (hn, cn) = self.action_lstm(action_tensor)
 
-        action_features = hn[-1].view(hn[-1].size(0), -1) 
+        # action_features = hn[-1].view(hn[-1].size(0), -1) 
+
+        action_tensor = action_tensor.view(action_tensor.shape[0], -1)
+        action_features = F.relu(self.action_fc1(action_tensor))
+        action_features = F.relu(self.action_fc2(action_features))
+
+
 
         combined = torch.cat((card_features, action_features), dim=1)
         combined = F.relu(self.fc1(combined))
@@ -226,14 +235,14 @@ class DQNAgent:
                  epsilon_greedy=1.0,
                  epsilon_min=0.01,
                  epsilon_decay=0.995,
-                 learning_rate=0.001,
-                 max_memory_size=2000,
-                 batch_size=64,
-                 train_every=100,
+                 learning_rate=0.00005,
+                 max_memory_size=20000,
+                 batch_size=1000,
+                 train_every=1,
                  save_path=None, 
                  save_every=float('inf'),
                  device=None,
-                 update_target_every=100):
+                 update_target_every=500):
 
 
         self.device = device
@@ -250,10 +259,6 @@ class DQNAgent:
         action_channel_shape = (3, NUM_BETTING_OPTIONS) # (4 dimensions, 6 actions)
 
         action_feature_shape = (action_channels, *action_channel_shape)        
-
-
-        state_shape = (card_feature_shape, action_feature_shape)
-
 
         self.state_shape = (card_feature_shape, action_feature_shape) 
 
@@ -348,8 +353,8 @@ class DQNAgent:
         """predict the q values, mask illegal actions with -inf"""
         card_state, action_state = process_state(state)
         with torch.no_grad():
-            card_tensor = torch.tensor(card_state, dtype=torch.float32).to(self.device)
-            action_tensor = torch.tensor(action_state, dtype=torch.float32).to(self.device)
+            card_tensor = torch.tensor(card_state, dtype=torch.float32, device=self.device)
+            action_tensor = torch.tensor(action_state, dtype=torch.float32, device=self.device)
             card_tensor = card_tensor.unsqueeze(0)
             action_tensor = action_tensor.unsqueeze(0)
 
@@ -397,46 +402,29 @@ class DQNAgent:
         states, actions, rewards, next_states, dones, _ = zip(*batch)
 
 
-        card_tensors = [torch.tensor(state[0], dtype=torch.float32) for state in states]
-        action_tensors = [torch.tensor(state[1], dtype=torch.float32) for state in states]
-        card_tensors = torch.stack(card_tensors).to(self.device)
-        action_tensors = torch.stack(action_tensors).to(self.device)
+        card_tensors = [torch.tensor(state[0], dtype=torch.float32, device=self.device) for state in states]
+        action_tensors = [torch.tensor(state[1], dtype=torch.float32, device=self.device) for state in states]
+        card_tensors = torch.stack(card_tensors)
+        action_tensors = torch.stack(action_tensors)
 
-        next_card_tensors = [torch.tensor(state[0], dtype=torch.float32) for state in next_states]
-        next_action_tensors = [torch.tensor(state[1], dtype=torch.float32) for state in next_states]
-        next_card_tensors = torch.stack(next_card_tensors).to(self.device)
-        next_action_tensors = torch.stack(next_action_tensors).to(self.device)
-
-
+        next_card_tensors = [torch.tensor(state[0], dtype=torch.float32, device=self.device) for state in next_states]
+        next_action_tensors = [torch.tensor(state[1], dtype=torch.float32, device=self.device) for state in next_states]
+        next_card_tensors = torch.stack(next_card_tensors)
+        next_action_tensors = torch.stack(next_action_tensors)
         
 
-
-
-        # states = torch.tensor(np.array(states), dtype=torch.float32)
-        # next_states = torch.tensor(np.array(next_states), dtype=torch.float32)
-        actions = torch.tensor(np.array(actions), dtype=torch.long).to(self.device) 
-        rewards = torch.tensor(np.array(rewards), dtype=torch.float32).to(self.device)
-        dones = torch.tensor(np.array(dones), dtype=torch.float32).to(self.device)
+        # actions = torch.tensor(np.array(actions), dtype=torch.long) 
+        rewards = torch.tensor(np.array(rewards), dtype=torch.float32, device=self.device)
+        dones = torch.tensor(np.array(dones), dtype=torch.float32, device=self.device)
         
-
-        # Predict Q-values for the current states
-        predicted_q_values = self.model(card_tensors, action_tensors)
-
-        # Predict Q-values for the next states using the target network
-        next_q_values = self.target_model(next_card_tensors, next_action_tensors)
-
-
-        # Compute the target Q-values
-        target_q_values = rewards.unsqueeze(1) + (self.gamma * next_q_values * (1 - dones).unsqueeze(1))
-
-        # Compute loss
-        loss = self.loss_fn(predicted_q_values, target_q_values)
-        # print(loss.item())
-
-        # Backpropagation
         self.optimizer.zero_grad()
+        predicted_q_values = self.model(card_tensors, action_tensors)
+        next_q_values = self.target_model(next_card_tensors, next_action_tensors)
+        target_q_values = rewards.unsqueeze(1) + (self.gamma * next_q_values * (1 - dones).unsqueeze(1))
+        loss = self.loss_fn(predicted_q_values, target_q_values)
         loss.backward()
         self.optimizer.step()
+
 
         # Update epsilon
         if self.epsilon > self.epsilon_min:
