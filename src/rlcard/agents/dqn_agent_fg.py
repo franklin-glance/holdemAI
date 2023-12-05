@@ -178,8 +178,8 @@ class NNModel(nn.Module):
         self.card_conv3 = nn.Conv2d(in_channels=32, out_channels=64, kernel_size=3, stride=1, padding=1)
 
 
-        self.card_flattened_size = 64 * 4 * 13 
-        self.action_flattened_size = 24 * 3 * NUM_BETTING_OPTIONS
+        self.card_flattened_size = 64 * 4 * 13  # 3328
+        self.action_flattened_size = 24 * 3 * NUM_BETTING_OPTIONS # 360
 
         # input shape: [batch_size, sequence_length, features]
         self.action_lstm = nn.LSTM(input_size=15, hidden_size=128, num_layers=2, batch_first=True)
@@ -309,6 +309,8 @@ class DQNAgent:
 
         self.update_target_every = update_target_every
 
+        self.losses = []
+
 
 
     def _build_nn_model(self):
@@ -432,6 +434,7 @@ class DQNAgent:
         next_q_values = self.target_model(next_card_tensors, next_action_tensors)
         target_q_values = rewards.unsqueeze(1) + (self.gamma * next_q_values * (1 - dones).unsqueeze(1))
         loss = self.loss_fn(predicted_q_values, target_q_values)
+        self.losses.append(loss.item())
         loss.backward()
         self.optimizer.step()
 

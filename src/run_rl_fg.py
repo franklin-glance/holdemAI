@@ -21,6 +21,7 @@ import rlcard
 
 from rlcard.agents.dqn_agent_fg import DQNAgent
 
+import matplotlib.pyplot as plt
 
 def train(args):
     # Check whether gpu is available
@@ -96,12 +97,18 @@ def train(args):
                         args.num_eval_games,
                     )[0]
                 )
+                logger.log(f'epsilon: {agent.epsilon}')
+                logger.log(f'agent_buffer_size: {len(agent.memory)}')
+                
 
         # Get the paths
         csv_path, fig_path = logger.csv_path, logger.fig_path
 
     # Plot the learning curve
     plot_curve(csv_path, fig_path, 'fg_dqn')
+
+    plt.plot(agent.losses)
+    plt.savefig(os.path.join(args.log_dir, 'losses.png'))
 
     # Save model
     save_path = os.path.join(args.log_dir, 'model.pth')
@@ -170,7 +177,7 @@ if __name__ == '__main__':
     parser.add_argument(
         "--learning_rate",
         type=float,
-        default=0.01)
+        default=0.0001)
     parser.add_argument(
         "--max_memory_size",
         type=int,
@@ -178,15 +185,15 @@ if __name__ == '__main__':
     parser.add_argument(
         "--train_every",
         type=int,
-        default=1)
+        default=512)
     parser.add_argument(
         "--batch_size",
         type=int,
-        default=128)
+        default=1028)
     parser.add_argument(
         "--update_target_every",
         type=int,
-        default=100)
+        default=32)
 
     args = parser.parse_args()
 
