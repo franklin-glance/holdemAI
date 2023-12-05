@@ -54,8 +54,8 @@ def train(args):
 
     agents = [agent]
     for _ in range(1, env.num_players):
-        # agents.append(RandomAgent(num_actions=env.num_actions))
-        agents.append(agent)
+        agents.append(RandomAgent(num_actions=env.num_actions))
+        # agents.append(agent)
 
     env.set_agents(agents)
 
