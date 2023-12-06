@@ -185,7 +185,7 @@ if __name__ == '__main__':
     parser.add_argument(
         '--evaluate_every',
         type=int,
-        default=1000,
+        default=10000,
     )
     parser.add_argument(
         '--log_dir',
@@ -224,7 +224,7 @@ if __name__ == '__main__':
     parser.add_argument(
         "--train_every",
         type=int,
-        default=1024)
+        default=32)
     parser.add_argument(
         "--batch_size",
         type=int,
