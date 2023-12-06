@@ -494,4 +494,4 @@ class DQNAgent:
         if self.train_t % self.update_target_every == 0:
             self.target_model = deepcopy(self.model).to(self.device)
 
-        print(f'training took {time.time() - train_batch_start_time} seconds')
+        # print(f'training took {time.time() - train_batch_start_time} seconds')
