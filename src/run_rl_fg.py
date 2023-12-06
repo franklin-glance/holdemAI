@@ -163,11 +163,11 @@ def train(args):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser("DQN/NFSP example in RLCard")
-    # parser.add_argument(
-    #     '--cuda',
-    #     type=str,
-    #     default='',
-    # )
+    parser.add_argument(
+        '--cuda',
+        type=str,
+        default='',
+    )
     parser.add_argument(
         '--seed',
         type=int,
@@ -237,5 +237,5 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
-    # os.environ["CUDA_VISIBLE_DEVICES"] = args.cuda
+    os.environ["CUDA_VISIBLE_DEVICES"] = args.cuda
     train(args)
