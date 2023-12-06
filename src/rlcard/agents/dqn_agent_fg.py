@@ -1,3 +1,4 @@
+import time
 import numpy as np
 import torch
 import torch.nn as nn
@@ -54,14 +55,14 @@ def process_state(state):
     raw_obs = state['raw_obs']
     hand = raw_obs['hand'] # ex: ['S10', 'D10']
     public_cards = raw_obs['public_cards']
-    all_chips = raw_obs['all_chips']
-    my_chips = raw_obs['my_chips'] 
-    legal_actions = raw_obs['legal_actions']
-    stakes = raw_obs['stakes']
-    current_player = raw_obs['current_player']
-    pot = raw_obs['pot']
-    stage = raw_obs['stage']
-    raw_legal_actions = state['raw_legal_actions']
+    # all_chips = raw_obs['all_chips']
+    # my_chips = raw_obs['my_chips'] 
+    # legal_actions = raw_obs['legal_actions']
+    # stakes = raw_obs['stakes']
+    # current_player = raw_obs['current_player']
+    # pot = raw_obs['pot']
+    # stage = raw_obs['stage']
+    # raw_legal_actions = state['raw_legal_actions']
     action_record = state['action_record'] # list of actions taken so far (player_id, action)
 
     # card feature
@@ -182,7 +183,7 @@ class NNModel(nn.Module):
         self.action_flattened_size = 24 * 3 * NUM_BETTING_OPTIONS # 360
 
         # input shape: [batch_size, sequence_length, features]
-        self.action_lstm = nn.LSTM(input_size=15, hidden_size=128, num_layers=2, batch_first=True)
+        # self.action_lstm = nn.LSTM(input_size=15, hidden_size=128, num_layers=2, batch_first=True)
 
         self.action_fc1 = nn.Linear(self.action_tensor_input_dim, 128)
         self.action_fc2 = nn.Linear(128, 128)
@@ -222,14 +223,55 @@ class NNModel(nn.Module):
 
         return q_values
 
-def custom_loss(y_pred, y_true):
-    """
-    Penalizes the agent more when 'fold' is the ideal action and the agent
-    chooses to 'call' or 'raise' instead.
-    """
-    standard_loss = torch.mean((y_pred - y_true)**2)
-    fold_loss = torch.mean((y_pred[:, 0] - y_true[:, 0])**2)
-    return standard_loss + fold_loss
+class NNModel_linear(nn.Module):
+
+    def __init__(self, card_tensor_input_dim, action_tensor_input_dim, action_dim, dropout_rate=0.5):
+        super(NNModel, self).__init__()
+
+        self.card_tensor_input_dim = card_tensor_input_dim
+        self.action_tensor_input_dim = action_tensor_input_dim
+        self.action_dim = action_dim
+        self.dropout_rate = dropout_rate
+
+        # Assuming card_tensor_input_dim is the flattened size of the card tensor
+        self.card_fc1 = nn.Linear(self.card_tensor_input_dim, 128)
+        self.card_fc2 = nn.Linear(128, 128)
+
+        self.action_fc1 = nn.Linear(self.action_tensor_input_dim, 128)
+        self.action_fc2 = nn.Linear(128, 128)
+
+        self.fc1 = nn.Linear(128 + 128, 512)
+        self.fc2 = nn.Linear(512, 256)
+        self.fc3 = nn.Linear(256, 128)
+        self.fc4 = nn.Linear(128, action_dim)
+
+        self.dropout = nn.Dropout(p=self.dropout_rate)
+
+    def forward(self, card_tensor, action_tensor):
+        # Flatten the card tensor
+        card_tensor = card_tensor.view(card_tensor.shape[0], -1)
+        card_features = F.relu(self.card_fc1(card_tensor))
+        card_features = F.relu(self.card_fc2(card_features))
+        card_features = self.dropout(card_features)
+
+        # Flatten and process the action tensor
+        action_tensor = action_tensor.view(action_tensor.shape[0], -1)
+        action_features = F.relu(self.action_fc1(action_tensor))
+        action_features = F.relu(self.action_fc2(action_features))
+        action_features = self.dropout(action_features)
+
+        # Combine the features and pass them through final layers
+        combined = torch.cat((card_features, action_features), dim=1)
+        combined = F.relu(self.fc1(combined))
+        combined = self.dropout(combined)
+        combined = F.relu(self.fc2(combined))
+        combined = self.dropout(combined)
+        combined = F.relu(self.fc3(combined))
+        combined = self.dropout(combined)
+        q_values = self.fc4(combined)
+
+        return q_values
+
 
 
 class DQNAgent:
@@ -410,6 +452,8 @@ class DQNAgent:
         Train the agent by sampling experiences from the memory buffer.
         '''
         # Sample a batch of transitions from the memory
+        train_batch_start_time = time.time()
+
         batch = self.sample_from_memory()
         states, actions, rewards, next_states, dones, _ = zip(*batch)
 
@@ -433,10 +477,12 @@ class DQNAgent:
         predicted_q_values = self.model(card_tensors, action_tensors)
         next_q_values = self.target_model(next_card_tensors, next_action_tensors)
         target_q_values = rewards.unsqueeze(1) + (self.gamma * next_q_values * (1 - dones).unsqueeze(1))
+
         loss = self.loss_fn(predicted_q_values, target_q_values)
         self.losses.append(loss.item())
         loss.backward()
         self.optimizer.step()
+
 
 
         # Update epsilon
@@ -447,3 +493,5 @@ class DQNAgent:
         # update target model
         if self.train_t % self.update_target_every == 0:
             self.target_model = deepcopy(self.model).to(self.device)
+
+        print(f'training took {time.time() - train_batch_start_time} seconds')
