@@ -74,6 +74,7 @@ def train(args):
     log_dir += '/'
     args.log_dir = os.path.join(args.log_dir, log_dir)
     rewards = []
+    eval_every_time = time.now()
     with Logger(args.log_dir) as logger:
         for episode in range(args.num_episodes):
             episode_start_time = time.time()
@@ -105,7 +106,15 @@ def train(args):
             # Evaluate the performance. Play with random agents.
 
 
-            if episode % args.evaluate_every == 0:
+            if episode % args.evaluate_every == 0 and episode >= args.batch_size:
+                duration = time.now() - eval_every_time
+                eval_every_time = time.now()
+
+                print(f'episode: {episode}')
+                print(f'time since last evaluation: {duration}')
+                print(f'average episode duration: {duration/args.evaluate_every}')
+
+
                 print("starting evaluation")
                 eval_start_time = time.time()
                 reward = tournament(
@@ -176,7 +185,7 @@ if __name__ == '__main__':
     parser.add_argument(
         '--evaluate_every',
         type=int,
-        default=100,
+        default=1000,
     )
     parser.add_argument(
         '--log_dir',
