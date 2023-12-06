@@ -74,7 +74,7 @@ def train(args):
     log_dir += '/'
     args.log_dir = os.path.join(args.log_dir, log_dir)
     rewards = []
-    eval_every_time = time.now()
+    eval_every_time = time.time()
     with Logger(args.log_dir) as logger:
         for episode in range(args.num_episodes):
             episode_start_time = time.time()
