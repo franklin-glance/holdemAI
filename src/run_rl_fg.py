@@ -107,8 +107,8 @@ def train(args):
 
 
             if episode % args.evaluate_every == 0 and episode >= args.batch_size:
-                duration = time.now() - eval_every_time
-                eval_every_time = time.now()
+                duration = time.time() - eval_every_time
+                eval_every_time = time.time()
 
                 print(f'episode: {episode}')
                 print(f'time since last evaluation: {duration}')
