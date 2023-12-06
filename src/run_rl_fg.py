@@ -28,6 +28,7 @@ def train(args):
     # Check whether gpu is available
     device = get_device()
     set_seed(args.seed)
+    print("training with args: ", args)
 
     # Make the environment with seed
     env = rlcard.make(
