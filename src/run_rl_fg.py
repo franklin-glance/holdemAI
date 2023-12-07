@@ -24,6 +24,9 @@ from rlcard.agents.dqn_agent_fg import DQNAgent
 import matplotlib.pyplot as plt
 import time
 
+
+print("running version 0.0.1")
+
 def train(args):
     # Check whether gpu is available
     device = get_device()
@@ -77,6 +80,7 @@ def train(args):
     rewards = []
     eval_every_time = time.time()
     with Logger(args.log_dir) as logger:
+        logger.log(f'args: {args}')
         for episode in range(args.num_episodes):
             episode_start_time = time.time()
             # Generate data from the environment
@@ -139,21 +143,30 @@ def train(args):
                 
                 # save plot of losses
                 plt.plot(agent.losses)
+                plt.title('Losses')
                 plt.savefig(os.path.join(args.log_dir, 'losses.png'))
+                # clear plot
+                plt.clf()
+
                 # plot rewards
                 plt.plot(rewards)
                 # add title with --num_eval_games
                 plt.title(f'Average reward over {args.num_eval_games} games')
                 plt.savefig(os.path.join(args.log_dir, 'rewards.png'))
+                # clear plot
+                plt.clf()
 
         # Get the paths
         csv_path, fig_path = logger.csv_path, logger.fig_path
 
+    plt.plot(agent.losses)
+    plt.title('Losses')
+    plt.savefig(os.path.join(args.log_dir, 'losses_final.png'))
+    plt.clf()
+
+
     # Plot the learning curve
     plot_curve(csv_path, fig_path, 'fg_dqn')
-
-    plt.plot(agent.losses)
-    plt.savefig(os.path.join(args.log_dir, 'losses.png'))
 
     # Save model
     save_path = os.path.join(args.log_dir, 'model.pth')
