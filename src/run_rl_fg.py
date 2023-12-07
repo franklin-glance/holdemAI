@@ -79,6 +79,8 @@ def train(args):
     args.log_dir = os.path.join(args.log_dir, log_dir)
     rewards = []
     eval_every_time = time.time()
+
+    total_num_evaluations = args.num_episodes // args.evaluate_every
     with Logger(args.log_dir) as logger:
         logger.log(f'args: {args}')
         for episode in range(args.num_episodes):
@@ -111,6 +113,8 @@ def train(args):
             # Evaluate the performance. Play with random agents.
 
 
+
+            eval_times = []
             if episode % args.evaluate_every == 0 and episode >= args.batch_size:
                 duration = time.time() - eval_every_time
                 eval_every_time = time.time()
@@ -118,6 +122,12 @@ def train(args):
                 print(f'episode: {episode}')
                 print(f'time since last evaluation: {duration}')
                 print(f'average episode duration: {duration/args.evaluate_every}')
+                expected_time_until_completion = (args.num_episodes - episode) * duration / args.evaluate_every
+                # add time from evaluation
+                print(f'expected time until completion: {expected_time_until_completion}')
+                if eval_times:
+                    additional_time_from_future_evals = sum(eval_times) / len(eval_times) * ((args.num_episodes - episode) // args.evaluate_every)
+                    print(f'expected time until completion (including eval time): {expected_time_until_completion + additional_time_from_future_evals}')
 
 
                 print("starting evaluation")
@@ -132,6 +142,7 @@ def train(args):
                 )
                 rewards.append(reward)
                 print(f'evaluation took {time.time() - eval_start_time} seconds')
+                eval_times.append(time.time() - eval_start_time)
                 logger.log(f'epsilon: {agent.epsilon}')
                 logger.log(f'agent_buffer_size: {len(agent.memory)}')
                 # overwrite the file with all losses
