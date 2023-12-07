@@ -420,6 +420,19 @@ class DQNAgent:
             masked_q_values[legal_actions] = q_values[legal_actions]
 
             return masked_q_values
+    
+    def predict_raw(self, card_state, action_state):
+        with torch.no_grad():
+            card_tensor = torch.tensor(card_state, dtype=torch.float32, device=self.device)
+            action_tensor = torch.tensor(action_state, dtype=torch.float32, device=self.device)
+            card_tensor = card_tensor.unsqueeze(0)
+            action_tensor = action_tensor.unsqueeze(0)
+
+
+            q_values = self.model(card_tensor, action_tensor)[-1].cpu().numpy()
+
+            return q_values 
+        
 
     def eval_step(self, state):
         ''' Predict the action for evaluation purpose.
@@ -495,3 +508,20 @@ class DQNAgent:
             self.target_model = deepcopy(self.model).to(self.device)
 
         # print(f'training took {time.time() - train_batch_start_time} seconds')
+    
+    def save_model(self, path):
+        ''' Save the model to the path
+
+        Args:
+            path (str): the path to save the model file
+        '''
+        torch.save(self.model, path)
+    
+    def __getstate__(self) -> object:
+        state = self.__dict__.copy()
+        del state['memory']
+        return state
+
+    def __setstate__(self, state) -> None:
+        self.__dict__.update(state)
+        self.memory = deque(maxlen=state.get('max_memory_size', 20000))

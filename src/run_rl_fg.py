@@ -25,7 +25,7 @@ import matplotlib.pyplot as plt
 import time
 
 
-print("running version 0.0.2")
+print("running version 0.0.5")
 
 def train(args):
     # Check whether gpu is available
@@ -181,8 +181,16 @@ def train(args):
 
     # Save model
     save_path = os.path.join(args.log_dir, 'model.pth')
-    torch.save(agent, save_path)
+    agent.save_model(save_path)
     print('Model saved in', save_path)
+
+    # save entire agent object as well, excluding the memory
+    save_path = os.path.join(args.log_dir, 'agent.pth')
+    torch.save(agent, save_path)
+    print('Agent saved in', save_path)
+
+
+
 
 
 if __name__ == '__main__':
