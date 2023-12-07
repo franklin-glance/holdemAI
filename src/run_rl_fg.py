@@ -25,7 +25,7 @@ import matplotlib.pyplot as plt
 import time
 
 
-print("running version 0.0.1")
+print("running version 0.0.2")
 
 def train(args):
     # Check whether gpu is available
