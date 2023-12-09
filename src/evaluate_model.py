@@ -32,7 +32,7 @@ def evaluate_preflop_range(args):
     # Initialization
     # Environment setup
     # env = rlcard.make('no-limit-holdem-fg', config={'seed': args.seed})
-    agent = torch.load(args.model_path)
+    agent = torch.load(args.model_path, map_location=torch.device('cpu'))
     # agents = [agent] + [RandomAgent(num_actions=env.num_actions) for _ in range(1, env.num_players)]
     # env.set_agents(agents)
 
